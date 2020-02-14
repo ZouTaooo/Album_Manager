@@ -74,6 +74,8 @@ public class MainActivity extends AppCompatActivity {
     private CosXmlService cosXmlService = null;
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
+    final private String SecretId = "";
+    final private String SecretKey = "";
     private ProgressDialog progressDialog = null;
     private int count = 0;//统计图片数量
     private int fail = 0;
