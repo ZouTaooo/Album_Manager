@@ -59,7 +59,7 @@ import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Function;
+import io.reactivex.functions.Consumer;
 import io.reactivex.schedulers.Schedulers;
 import okhttp3.OkHttpClient;
 import retrofit2.Call;
@@ -67,6 +67,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
+import top.zibin.luban.Luban;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -74,13 +75,14 @@ public class MainActivity extends AppCompatActivity {
     private CosXmlService cosXmlService = null;
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
-    final private String SecretId = "";
-    final private String SecretKey = "";
+    final private String SecretId = "AKIDf7LK4CUmGUUEiw9mRt68ub7PZWM1q0B7";
+    final private String SecretKey = "nNjuwjHadYFh7PWO1OXXM1QaZO4VhnhL";
     private ProgressDialog progressDialog = null;
     private int count = 0;//统计图片数量
-    private int fail = 0;
+    //    private int fail = 0;
     private Retrofit retrofit;
     private ApiService api;
+    private String cachePath;
 
     private static final String TAG = "MainActivity";
 
@@ -95,21 +97,29 @@ public class MainActivity extends AppCompatActivity {
         initCosService();
         //初始化Retrofit2请求
         initRetrofit();
-        try {
-            getLabels("[Cosdoki] 架乃ゆら Yura Kano kanoyura_pic_sailor1 写真集1.jpg");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
+        cachePath = getExternalCacheDir().getPath();
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     protected void onStart() {
         super.onStart();
-//        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-//                == PackageManager.PERMISSION_GRANTED) {
-//            getPicturePath();
-//        }
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED) {
+            //getPicturePath();
+            Log.e(TAG, "onStart: ////////////////////////////////////////////////////////");
+            List<Picture> pictures = DataSupport.findAll(Picture.class);
+            Log.e(TAG, "onStart: size: " + pictures.size());
+            for (Picture pic : pictures) {
+                Log.e(TAG, "onStart: id: " + pic.getId()
+                        + "\nName: " + pic.getName()
+                        + "\nPath: " + pic.getPath()
+                        + "\nFirst" + pic.getLabelFirstCategory()
+                        + "\nSecond" + pic.getLabelSecondCategory()
+                        + "\nLabel: " + pic.getLabelName());
+            }
+        }
     }
 
 
@@ -128,13 +138,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //获取标签
-    private void getLabels(String PicName) throws IOException {
+    private void getLabels(String PicName, final int id) throws IOException {
         long StartTime = System.currentTimeMillis() / 1000;//获取系统时间的10位的时间戳
         long EndTime = StartTime + 7200;
         String StartTimestamp = String.valueOf(StartTime);
         String EndTimestamp = String.valueOf(EndTime);
         String KeyTime = StartTimestamp + ";" + EndTimestamp;
         String SignKey = null;
+        Log.e(TAG, "getLabels: keyTime: " + KeyTime);
+        Log.e(TAG, "getLabels: SecretKey: " + SecretKey);
         try {
             SignKey = DigestUtils.getHmacSha1(KeyTime, SecretKey);
         } catch (CosXmlClientException e) {
@@ -194,28 +206,71 @@ public class MainActivity extends AppCompatActivity {
                 "&q-url-param-list=" + UrlParamList +
                 "&q-signature=" + Signature;
         Call<Label> getLabel = api.ImageAnalyse(PicName, "detect-label", Date, res);
-        //发同步请求
-//        Response<ResponseBody> response = getLabel.execute();
-//        response.body();
+        //Log.e(TAG, "getLabels: 发起同步请求");
+//        //发同步请求
+//        Response<Label> response = getLabel.execute();
+//        List<LabelsBean> labels = response.body().getLabelList();
+//        if (response.code() == 200) {
+//            Log.e(TAG, "getLabels: 获取标签成功");
+//            for (LabelsBean labelsBean : labels) {
+//                if (labelsBean.getFirstCategory() != null && labelsBean.getSecondCategory() != null && labelsBean.getName() != null) {
+//                    Log.e(TAG, "getLabels: 修改数据库");
+//                    String FirstCategory = labelsBean.getFirstCategory();
+//                    String SecondCategory = labelsBean.getSecondCategory();
+//                    String LabelName = labelsBean.getName();
+//                    Picture pic = DataSupport.find(Picture.class, id);
+//                    pic.setLabelFirstCategory(FirstCategory);
+//                    pic.setLabelSecondCategory(SecondCategory);
+//                    pic.setLabelName(LabelName);
+//                    pic.save();
+//                }
+//            }
+//            return true;
+//        }
+//        return false;
 
         //发异步请求
+        Log.e(TAG, "getLabels: 发送异步请求");
         getLabel.enqueue(new Callback<Label>() {
             @Override
             public void onResponse(Call<Label> call, Response<Label> response) {
-                Log.e(TAG, "onResponse: " + response.code());
-                Log.e(TAG, "onResponse: " + response.message());
+//                Log.e(TAG, "onResponse: " + response.code());
+//                Log.e(TAG, "onResponse: " + response.message());
                 // Log.e(TAG, "onResponse: " + response.toString());
-                Log.e(TAG, "onResponse: " + response.isSuccessful());
+                // Log.e(TAG, "onResponse: " + response.isSuccessful());
                 // Log.e(TAG, "onResponse: " + response.errorBody());
                 if (response.body() != null) {
-                    Log.e(TAG, "onResponse: " + response.raw().toString());
-                    Log.e(TAG, "onResponse: " + response.body().getLabelList().toString());
-                    Log.e(TAG, "onResponse: " + response.body().getLabelList().size());
+//                    Log.e(TAG, "onResponse: " + response.raw().toString());
+//                    Log.e(TAG, "onResponse: " + response.body().getLabelList().toString());
+//                    Log.e(TAG, "onResponse: " + response.body().getLabelList().size());
                     for (LabelsBean label : response.body().getLabelList()) {
-                        Log.e(TAG, "onResponse: Name" + label.getName());
-                        Log.e(TAG, "onResponse: Confidence" + label.getConfidence());
-                        Log.e(TAG, "onResponse: First" + label.getFirstCategory());
-                        Log.e(TAG, "onResponse: Second" + label.getSecondCategory());
+                        final String LabelName = label.getName();
+                        final String FirstCategory = label.getFirstCategory();
+                        final String SecondCategory = label.getSecondCategory();
+                        if (LabelName != null && FirstCategory != null && SecondCategory != null) {
+                            Observable.create(new ObservableOnSubscribe<Integer>() {
+                                @Override
+                                public void subscribe(ObservableEmitter<Integer> e) throws Exception {
+                                    Picture picture = DataSupport.find(Picture.class, id);
+                                    picture.setLabelName(LabelName);
+                                    picture.setLabelFirstCategory(FirstCategory);
+                                    picture.setLabelSecondCategory(SecondCategory);
+                                    picture.save();
+                                    count++;
+                                    e.onNext(count);
+                                }
+                            })
+                                    .subscribeOn(Schedulers.io())
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe(new Consumer<Integer>() {
+                                        @Override
+                                        public void accept(Integer o) throws Exception {
+                                            progressDialog.setMessage("图片分析成功" + o + "新图片");
+                                            Log.e(TAG, "onResponse: step3 访问标签成功");
+                                        }
+                                    });
+                            break;
+                        }
                     }
                 } else {
                     Log.e(TAG, "onResponse: body = null");
@@ -307,16 +362,22 @@ public class MainActivity extends AppCompatActivity {
 
     //获取图片路径
     private void getPicturePath() {
-        final Cursor photoCursor = this.getContentResolver().query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        final Cursor photoCursor = this.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                 null, null, null, null);
         Observable.create(new ObservableOnSubscribe<Picture>() {
             @Override
             public void subscribe(ObservableEmitter<Picture> e) throws Exception {
+                //int count = 0;
                 //获取本地图片信息
+                int num = 0;
                 try {
-                    while (photoCursor.moveToNext()) {
+                    while (photoCursor.moveToNext() && num < 3) {
                         String photoPath = photoCursor.getString(photoCursor.getColumnIndex(MediaStore.Images.Media.DATA));
+                        //如果不是相机拍摄的图片就跳过
+//                        Log.e(TAG, "subscribe: step1");
+                        if (!photoPath.startsWith("/storage/emulated/0/相机")) {
+                            continue;
+                        }
                         //照片日期
                         long photoDate = photoCursor.getLong(photoCursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN));
                         //照片标题
@@ -326,30 +387,26 @@ public class MainActivity extends AppCompatActivity {
                         BitmapFactory.decodeFile(photoPath, options);
                         //照片类型
                         String photoType = options.outMimeType;
-
                         //如果不是JPEG\JPG\PNG格式的则跳过
                         if (!photoType.equals("image/jpeg") && !photoType.equals("image/jpg") && !photoType.equals("image/png")) {
                             continue;
                         }
+                        //照片长度
+                        String photoLength = String.valueOf(options.outHeight);
+                        //照片宽度
+                        String photoWidth = String.valueOf(options.outWidth);
+
+                        File f = new File(photoPath);
+                        FileInputStream fis = new FileInputStream(f);
+                        //照片大小
+                        float size = fis.available() / 1000;
+                        String photoSize = size + "KB";
 
                         //数据库中已存在则跳过
                         List<Picture> pictureList = DataSupport.where("name=?", photoTitle).find(Picture.class);
                         if (pictureList.size() != 0) {
                             continue;
                         }
-
-                        //照片长度
-                        String photoLength = String.valueOf(options.outHeight);
-
-                        //照片宽度
-                        String photoWidth = String.valueOf(options.outWidth);
-
-                        File f = new File(photoPath);
-                        FileInputStream fis = new FileInputStream(f);
-
-                        //照片大小
-                        float size = fis.available() / 1000;
-                        String photoSize = size + "KB";
 
                         //存入数据库
                         Picture picture = new Picture();
@@ -359,11 +416,17 @@ public class MainActivity extends AppCompatActivity {
                         picture.setName(photoTitle);
                         picture.setPath(photoPath);
                         picture.setPut(false);
-                        //存入数据库失败 则跳过
-                        if (!picture.save()) {
-                            fail++;
+                        boolean flag = picture.save();
+                        //Log.e(TAG, "subscribe: 存入数据库的第" + picture.getId() + "行");
+                        //存入数据库
+                        if (!flag) {
+                            //fail++;
+                            Log.e(TAG, "subscribe: 存入数据库失败");
                             continue;
+                        } else {
+                            Log.e(TAG, "subscribe: 存入数据库成功");
                         }
+                        num++;
                         e.onNext(picture);
                     }
                     photoCursor.close();
@@ -373,33 +436,10 @@ public class MainActivity extends AppCompatActivity {
                     if (photoCursor != null) photoCursor.close();
                 }
             }
-        }).subscribeOn(Schedulers.io())
-                .observeOn(Schedulers.io())
-                .map(new Function<Picture, Picture>() {
-                    @Override
-                    public Picture apply(Picture picture) throws Exception {
-                        boolean isSuccess = putObject(picture.getName(), picture.getPath());
-                        if (isSuccess) {
-                            return picture;
-                        } else {
-                            fail++;
-                        }
-                        return null;
-                    }
-                })
-                .observeOn(Schedulers.io())
-                .map(new Function<Picture, Integer>() {
-                    @Override
-                    public Integer apply(Picture picture) throws Exception {
-                        if (picture != null) {
-                            //请求标签
-                            //getLabels();
-                        }
-                        return count;
-                    }
-                })
+        })
+                .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Observer<Integer>() {
+                .subscribe(new Observer<Picture>() {
                     @Override
                     public void onSubscribe(Disposable d) {
                         if (progressDialog == null) {
@@ -412,9 +452,13 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onNext(Integer value) {
-                        Log.e(TAG, "onNext: " + value);
-                        progressDialog.setMessage("已扫描" + value + "张新图片...");
+                    public void onNext(Picture value) {
+                        //progressDialog.setMessage("已扫描成功" + count + "张新图片...");
+                        try {
+                            putObject(value.getName(), value.getPath(), value.getId());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
 
                     @Override
@@ -424,19 +468,28 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onComplete() {
-                        progressDialog.setMessage("扫描结束...");
+                        //progressDialog.setMessage("扫描结束...");
                     }
                 });
     }
 
 
     //上传对象
-    private boolean putObject(final String picName, final String picPath) {
+    private void putObject(final String picName, final String picPath, final int id) throws IOException {
         String bucket = bucketName; //存储桶，格式：BucketName-APPID
         String cosPath = picName; //对象位于存储桶中的位置标识符，即对象键。例如 cosPath = "text.txt";
-        String srcPath = picPath;//"本地文件的绝对路径";
-        PutObjectRequest putObjectRequest = new PutObjectRequest(bucket, cosPath, srcPath);
+        final String srcPath;//"本地文件的绝对路径";
 
+
+        File f = new File(picPath);
+
+        //压缩图片
+        List<File> files = Luban.with(MainActivity.this).load(f).setTargetDir(cachePath).get();
+        File file = files.get(0);
+        //压缩图片的缓存路径
+        srcPath = file.getAbsolutePath();
+        Log.e(TAG, "putObject: 压缩图片的绝对路径：" + srcPath);
+        PutObjectRequest putObjectRequest = new PutObjectRequest(bucket, cosPath, srcPath);
 //        putObjectRequest.setProgressListener(new CosXmlProgressListener() {
 //            @Override
 //            public void onProgress(long progress, long max) {
@@ -444,37 +497,66 @@ public class MainActivity extends AppCompatActivity {
 //                Log.e(TAG, "onProgress: 上传中");
 //            }
 //        });
+
+
         // 设置签名校验 Host，默认校验所有 Header
         Set<String> headerKeys = new HashSet<>();
         headerKeys.add("Host");
         putObjectRequest.setSignParamsAndHeaders(null, headerKeys);
         //使用同步方法上传
-        try {
-            PutObjectResult putObjectResult = cosXmlService.putObject(putObjectRequest);
-            if (putObjectResult.httpCode == 200) {
-                return true;
-            }
-        } catch (CosXmlClientException e) {
-            e.printStackTrace();
-        } catch (CosXmlServiceException e) {
-            e.printStackTrace();
-        }
-        return false;
+//        try {
+//            PutObjectResult putObjectResult = cosXmlService.putObject(putObjectRequest);
+//            if (putObjectResult.httpCode == 200) {
+//                //上传成功
+//                Log.e(TAG, "putObject: 上传成功");
+//                Picture pic = DataSupport.find(Picture.class, id);
+//                Log.e(TAG, "putObject: 修改前路径：" + pic.getPath());
+//                pic.setPath(srcPath);
+//                pic.setPut(true);
+//                pic.save();
+//                return true;
+//            }
+//        } catch (CosXmlClientException e) {
+//            e.printStackTrace();
+//        } catch (CosXmlServiceException e) {
+//            e.printStackTrace();
+//        }
+//        return false;
 
-//        // 使用异步回调上传
-//        cosXmlService.putObjectAsync(putObjectRequest, new CosXmlResultListener() {
-//            @Override
-//            public void onSuccess(CosXmlRequest cosXmlRequest, CosXmlResult result) {
-//                PutObjectResult putObjectResult = (PutObjectResult) result;
-//                Log.e(TAG, "putObject: " + picName + "  " + picPath + "  上传结果： " + putObjectResult.httpCode);
-//            }
-//
-//            @Override
-//            public void onFail(CosXmlRequest cosXmlRequest, CosXmlClientException clientException, CosXmlServiceException serviceException) {
-//                // todo Put object failed because of CosXmlClientException or CosXmlServiceException...
-//                Log.e(TAG, "onFail: " + serviceException.getMessage() + "\n" + serviceException.getErrorCode());
-//            }
-//        });
+        // 使用异步回调上传
+        cosXmlService.putObjectAsync(putObjectRequest, new CosXmlResultListener() {
+            @Override
+            public void onSuccess(CosXmlRequest cosXmlRequest, CosXmlResult result) {
+                PutObjectResult putObjectResult = (PutObjectResult) result;
+                Log.e(TAG, "putObject: " + picName + "  " + srcPath + "  上传结果： " + putObjectResult.httpCode);
+                Observable.create(new ObservableOnSubscribe<Picture>() {
+                    @Override
+                    public void subscribe(ObservableEmitter<Picture> e) throws Exception {
+                        Picture picture = DataSupport.find(Picture.class, id);
+                        picture.setPut(true);
+                        picture.setPath(srcPath);
+                        picture.save();
+                        Log.e(TAG, "accept: step2成功");
+                        //count++;
+                        e.onNext(picture);
+                    }
+                })
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(new Consumer<Picture>() {
+                            @Override
+                            public void accept(Picture o) throws IOException {
+                                getLabels(o.getName(), o.getId());
+                            }
+                        });
+            }
+
+            @Override
+            public void onFail(CosXmlRequest cosXmlRequest, CosXmlClientException clientException, CosXmlServiceException serviceException) {
+                // todo Put object failed because of CosXmlClientException or CosXmlServiceException...
+                Log.e(TAG, "onFail: " + serviceException.getMessage() + "\n" + serviceException.getErrorCode());
+            }
+        });
     }
 
     //访问对象

@@ -4,9 +4,10 @@ import org.litepal.crud.DataSupport;
 
 
 public class Picture extends DataSupport {
-    //long id;//id
 
-    String name;//
+    int id;//id
+
+    String name;//title
 
     String path;//路径
 
@@ -18,13 +19,13 @@ public class Picture extends DataSupport {
 
     String labelSecondCategory;
 
-//    public long getId() {
-//        return id;
-//    }
-//
-//    public void setId(long id) {
-//        this.id = id;
-//    }
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
 
     public String getName() {
         return name;
