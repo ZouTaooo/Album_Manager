@@ -21,7 +21,7 @@ public class SecondCategoryActivity extends AppCompatActivity {
 
     final int SECOND_LEVEL = 2;
     final private String[] spot = {"办公场所", "工业", "公共设施", "建筑", "生活/娱乐场所", "自然风光"};
-    final private String[] alive = {"哺乳动物", "宠物", "海洋生物", "花草", "昆虫", "鸟类", "爬行动物", "鱼类"};
+    final private String[] alive = {"哺乳动物", "宠物", "海洋生物", "花草", "昆虫", "鸟类", "爬行动物", "鱼类","两栖动物","树"};
     final private String[] card = {"表格图表", "单据票据", "卡证", "印刷品"};
     final private String[] food = {"菜品", "干果坚果", "食材配料", "蔬菜", "水果", "甜品零食", "饮品", "主食"};
     final private String[] people = {"人像", "人体部位"};

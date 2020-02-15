@@ -127,7 +127,7 @@ public class EntryActivity extends AppCompatActivity {
 
     private void initBackgroundPic() {
         imageView = findViewById(R.id.entry_pic);
-        Glide.with(this).load("https://api.xygeng.cn/bing/1920.php").into(imageView);
+        Glide.with(this).load(R.drawable.entry).into(imageView);
     }
 
     private void setTitleBar() {
@@ -413,6 +413,7 @@ public class EntryActivity extends AppCompatActivity {
     }
 
     private void updateProgressDialog() {
+        Log.e(TAG, "updateProgressDialog: 更新...");
         //更新Dialog
         progressDialog.setMessage("共需要分析" + count + "张图片\n"
                 + "已成功" + success + "张图片\n"
@@ -462,7 +463,7 @@ public class EntryActivity extends AppCompatActivity {
                 try {
                     //还有下一张图片或者图片数量没到设置的预期的时候继续处理
                     //TODO 增加图片限制
-                    while (photoCursor.moveToNext()) {
+                    while (photoCursor.moveToNext() && num < 20) {
                         String photoPath = photoCursor.getString(photoCursor.getColumnIndex(MediaStore.Images.Media.DATA));
 
                         //如果不是相机拍摄的图片就跳过
@@ -550,6 +551,7 @@ public class EntryActivity extends AppCompatActivity {
                     public void onNext(Picture value) {
                         try {
                             //依据存入数据库的图片信息将图片压缩并上传到服务器
+                            updateProgressDialog();
                             putObject(value.getName(), value.getPath(), value.getId());
                         } catch (IOException e) {
                             e.printStackTrace();

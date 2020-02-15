@@ -117,9 +117,6 @@ public class FirstCategoryActivity extends AppCompatActivity {
             Log.e(TAG, "onStart: size: " + pictures.size());
             for (Picture pic : pictures) {
                 Log.e(TAG, "onStart: id: " + pic.getId()
-                        + "\nName: " + pic.getName()
-                        + "\nPath: " + pic.getPath()
-                        + "\nFirst" + pic.getLabelFirstCategory()
                         + "\nSecond" + pic.getLabelSecondCategory()
                         + "\nLabel: " + pic.getLabelName());
             }
