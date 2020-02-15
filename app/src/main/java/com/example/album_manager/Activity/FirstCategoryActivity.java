@@ -11,8 +11,11 @@ import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 
+import com.example.album_manager.Adapter.PicAdapter;
 import com.example.album_manager.Bean.Label;
 import com.example.album_manager.Bean.LabelsBean;
 import com.example.album_manager.Bean.Picture;
@@ -45,6 +48,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
@@ -70,13 +74,14 @@ import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
 import top.zibin.luban.Luban;
 
 
-public class MainActivity extends AppCompatActivity {
+public class FirstCategoryActivity extends AppCompatActivity {
 
     private CosXmlService cosXmlService = null;
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
     final private String SecretId = "";
     final private String SecretKey = "";
+    final int FIRST_LEVEL = 1;
     private ProgressDialog progressDialog = null;
     private int count = 0;//统计图片数量
     //    private int fail = 0;
@@ -84,21 +89,42 @@ public class MainActivity extends AppCompatActivity {
     private ApiService api;
     private String cachePath;
 
-    private static final String TAG = "MainActivity";
+    private RecyclerView recyclerView;
 
+    final private String[] firstCategory = {"场景", "动植物", "卡证文档", "美食", "人物", "事件", "物品", "其他"};
+    private static final String TAG = "FirstCategoryActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        //检查访问外存权限
-        getExternalStoragePermission();
+        setContentView(R.layout.activity_first_category);
+
         //初始化Cos服务
         initCosService();
+
         //初始化Retrofit2请求
         initRetrofit();
 
+        //设置缓存路径
         cachePath = getExternalCacheDir().getPath();
+
+        initRecyclerView();
+    }
+
+    private void initRecyclerView() {
+        recyclerView = findViewById(R.id.first_recycler_view);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(this, 2);
+        recyclerView.setLayoutManager(gridLayoutManager);
+        List<Picture> pictures = new ArrayList<>();
+        for (String string : firstCategory) {
+            Picture picture = DataSupport.where("labelFirstCategory=?", string).findFirst(Picture.class);
+            if (picture != null) {
+                picture.setName(string);
+                pictures.add(picture);
+            }
+        }
+        PicAdapter picAdapter = new PicAdapter(pictures, this, FIRST_LEVEL);
+        recyclerView.setAdapter(picAdapter);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
@@ -109,16 +135,16 @@ public class MainActivity extends AppCompatActivity {
                 == PackageManager.PERMISSION_GRANTED) {
             //getPicturePath();
             Log.e(TAG, "onStart: ////////////////////////////////////////////////////////");
-            List<Picture> pictures = DataSupport.findAll(Picture.class);
-            Log.e(TAG, "onStart: size: " + pictures.size());
-            for (Picture pic : pictures) {
-                Log.e(TAG, "onStart: id: " + pic.getId()
-                        + "\nName: " + pic.getName()
-                        + "\nPath: " + pic.getPath()
-                        + "\nFirst" + pic.getLabelFirstCategory()
-                        + "\nSecond" + pic.getLabelSecondCategory()
-                        + "\nLabel: " + pic.getLabelName());
-            }
+//            List<Picture> pictures = DataSupport.findAll(Picture.class);
+//            Log.e(TAG, "onStart: size: " + pictures.size());
+//            for (Picture pic : pictures) {
+//                Log.e(TAG, "onStart: id: " + pic.getId()
+//                        + "\nName: " + pic.getName()
+//                        + "\nPath: " + pic.getPath()
+//                        + "\nFirst" + pic.getLabelFirstCategory()
+//                        + "\nSecond" + pic.getLabelSecondCategory()
+//                        + "\nLabel: " + pic.getLabelName());
+//            }
         }
     }
 
@@ -309,55 +335,7 @@ public class MainActivity extends AppCompatActivity {
                 .method("GET")
                 .build());
 
-        cosXmlService = new CosXmlService(MainActivity.this, serviceConfig, credentialProvider);
-    }
-
-    //获取外存权限
-    private void getExternalStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
-                Log.e(TAG, "getExternalStoragePermission: No permission");
-                // Should we show an explanation?
-                if (shouldShowRequestPermissionRationale(
-                        Manifest.permission.READ_EXTERNAL_STORAGE)) {
-                    // Explain to the user why we need to read the contacts
-                    Log.e(TAG, "getExternalStoragePermission: Explain...");
-                }
-
-                Log.e(TAG, "getExternalStoragePermission: request...");
-                requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
-                        0
-                );
-                // MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE is an
-                // app-defined int constant that should be quite unique
-            }
-        }
-    }
-
-
-    //权限请求回调
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode) {
-            case 0: {
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    // permission was granted
-                    // request successfully, handle you transactions
-
-                } else {
-
-                    // permission denied
-                    // request failed
-                }
-                return;
-            }
-            default:
-                break;
-        }
+        cosXmlService = new CosXmlService(FirstCategoryActivity.this, serviceConfig, credentialProvider);
     }
 
     //获取图片路径
@@ -443,7 +421,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSubscribe(Disposable d) {
                         if (progressDialog == null) {
-                            progressDialog = new ProgressDialog(MainActivity.this);
+                            progressDialog = new ProgressDialog(FirstCategoryActivity.this);
                         }
                         progressDialog.setTitle("扫描图片");
                         progressDialog.setMessage("已扫描到0张新图片...");
@@ -484,7 +462,7 @@ public class MainActivity extends AppCompatActivity {
         File f = new File(picPath);
 
         //压缩图片
-        List<File> files = Luban.with(MainActivity.this).load(f).setTargetDir(cachePath).get();
+        List<File> files = Luban.with(FirstCategoryActivity.this).load(f).setTargetDir(cachePath).get();
         File file = files.get(0);
         //压缩图片的缓存路径
         srcPath = file.getAbsolutePath();
