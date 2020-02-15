@@ -20,13 +20,13 @@ import java.util.List;
 public class SecondCategoryActivity extends AppCompatActivity {
 
     final int SECOND_LEVEL = 2;
-    final private String[] spot = {"办公场所", "工业", "公共设施", "建筑", "生活或娱乐场所", "自然风光"};
+    final private String[] spot = {"办公场所", "工业", "公共设施", "建筑", "生活/娱乐场所", "自然风光"};
     final private String[] alive = {"哺乳动物", "宠物", "海洋生物", "花草", "昆虫", "鸟类", "爬行动物", "鱼类"};
     final private String[] card = {"表格图表", "单据票据", "卡证", "印刷品"};
     final private String[] food = {"菜品", "干果坚果", "食材配料", "蔬菜", "水果", "甜品零食", "饮品", "主食"};
     final private String[] people = {"人像", "人体部位"};
     final private String[] event = {"庆祝活动", "休闲娱乐活动", "运动"};
-    final private String[] stuff = {"餐具厨具", "穿着饰品", "电子产品及配件", "工具", "家具家装", "家用电器",
+    final private String[] stuff = {"餐具厨具", "穿着饰品", "电子产品及配件", "工具", "家具家装", "家用电器", "其他",
             "交通工具", "警用器材", "乐器", "日常用品", "玩具", "文具办公", "武器", "医疗用品", "艺术品工艺品",
             "运动器械与用品", "标牌标识", "机械装备或车辆"};
     final private String[] other = {"二维码条形码", "屏幕/界面/截图", "违规", "绘画卡通"};
