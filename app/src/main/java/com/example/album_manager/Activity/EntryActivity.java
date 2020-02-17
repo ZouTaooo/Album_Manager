@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -76,24 +77,33 @@ import retrofit2.Retrofit;
 import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
 import top.zibin.luban.Luban;
 
+import static android.os.Environment.getExternalStoragePublicDirectory;
+
 public class EntryActivity extends AppCompatActivity {
     private CosXmlService cosXmlService = null;
+
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
     final private String SecretId = "AKIDf7LK4CUmGUUEiw9mRt68ub7PZWM1q0B7";
     final private String SecretKey = "nNjuwjHadYFh7PWO1OXXM1QaZO4VhnhL";
+
     private ProgressDialog progressDialog = null;
     private int count = 0;//统计图片数量
     private int success = 0;//成功数量
     private int fail = 0;//失败数量
+
+    //private int num = 0;
     private boolean isSure = false;
+
     private Retrofit retrofit;
     private ApiService api;
+
+    //缓存路径
     private String cachePath;
 
-
+    //背景图片
     private ImageView imageView;
-
+    //private NumberProgressBar progressBar;
 
     private static final String TAG = "EntryActivity";
 
@@ -104,6 +114,8 @@ public class EntryActivity extends AppCompatActivity {
 
         //初始化背景图片
         initBackgroundPic();
+
+        //progressBar = findViewById(R.id.number_progress_bar);
 
         //隐藏状态栏
         setStatusBar();
@@ -119,6 +131,8 @@ public class EntryActivity extends AppCompatActivity {
 
         //设置缓存路径
         cachePath = getExternalCacheDir().getPath();
+
+        Log.e(TAG, "onCreate: " + getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath());
 
         //IMG_20180306_145749.jpg  /storage/emulated/0/Android/data/com.example.album_manager/cache/1581763835880219.jpg
         //检查访问外存权限
@@ -184,6 +198,7 @@ public class EntryActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
                     != PackageManager.PERMISSION_GRANTED) {
+                //没有获得权限，请求权限
                 Log.e(TAG, "getExternalStoragePermission: No permission");
                 // Should we show an explanation?
                 if (shouldShowRequestPermissionRationale(
@@ -193,12 +208,14 @@ public class EntryActivity extends AppCompatActivity {
                 }
 
                 Log.e(TAG, "getExternalStoragePermission: request...");
+                //请求访问外存权限 请求code 0 用于请求结果的回调
                 requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                         0
                 );
                 // MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE is an
                 // app-defined int constant that should be quite unique
             } else {
+                //已获得了权限 判断是否被初始化 如果初始化了延迟两秒进入 如果没有初始化进行初始化
                 SharedPreferences pref = getSharedPreferences("data", MODE_PRIVATE);
                 Boolean isInitApp = pref.getBoolean("IS_INIT_APP", false);
                 if (!isInitApp) {
@@ -338,6 +355,7 @@ public class EntryActivity extends AppCompatActivity {
 
         Log.e(TAG, "getLabels: 发送异步请求");
         //发异步请求
+//        num++;//
         getLabel.enqueue(new Callback<Label>() {
             @Override
             public void onResponse(Call<Label> call, Response<Label> response) {
@@ -347,54 +365,66 @@ public class EntryActivity extends AppCompatActivity {
                 // Log.e(TAG, "onResponse: " + response.isSuccessful());
                 // Log.e(TAG, "onResponse: " + response.errorBody());
                 //获取标签成功
+                success++;
                 if (response.body() != null) {
 //                    Log.e(TAG, "onResponse: " + response.raw().toString());
 //                    Log.e(TAG, "onResponse: " + response.body().getLabelList().toString());
 //                    Log.e(TAG, "onResponse: " + response.body().getLabelList().size());
                     //选择可信度最高的标签 更新数据库
-                    for (LabelsBean label : response.body().getLabelList()) {
+                    List<LabelsBean> list = response.body().getLabelList();
+                    //int confidence = list.get(0).getConfidence();
+                    for (LabelsBean label : list) {
                         final String LabelName = label.getName();
                         final String FirstCategory = label.getFirstCategory();
                         final String SecondCategory = label.getSecondCategory();
+                        final int Confidence = label.getConfidence();
                         //防止有空数据 判断全部都有效再存入
                         if (LabelName != null && FirstCategory != null && SecondCategory != null) {
                             //切入IO线程进行数据库操作
-                            Observable.create(new ObservableOnSubscribe<Integer>() {
+                            Observable.create(new ObservableOnSubscribe<Picture>() {
                                 @Override
-                                public void subscribe(ObservableEmitter<Integer> e) throws Exception {
+                                public void subscribe(ObservableEmitter<Picture> e) throws Exception {
+                                    Log.e(TAG, "subscribe: /////////////");
                                     Picture picture = DataSupport.find(Picture.class, id);
                                     //修改图片的一级标签、二级标签、标签名
                                     picture.setLabelName(LabelName);
                                     picture.setLabelFirstCategory(FirstCategory);
                                     picture.setLabelSecondCategory(SecondCategory);
+                                    picture.setConfidence(Confidence);
                                     picture.save();
                                     //成功数量加一
-                                    success++;
                                     //切回主线程进行更新UI
-                                    e.onNext(success);
+                                    e.onNext(picture);
                                 }
                             })
                                     .subscribeOn(Schedulers.io())
                                     .observeOn(AndroidSchedulers.mainThread())
-                                    .subscribe(new Consumer<Integer>() {
+                                    .subscribe(new Consumer<Picture>() {
                                         @Override
-                                        public void accept(Integer o) throws Exception {
+                                        public void accept(Picture o) throws Exception {
                                             //如果count的值已确定，且所有图片处理完毕
-                                            int num = success + fail;
-                                            if (num == count && isSure) {
+                                            int all = success + fail;
+                                            //count已确定且所有请求结果都获得
+                                            if (all == count && isSure) {
                                                 //写入缓存-初始化完成
                                                 SharedPreferences.Editor editor = getSharedPreferences("data", MODE_PRIVATE).edit();
                                                 editor.putBoolean("IS_INIT_APP", true);
                                                 editor.apply();
                                                 progressDialog.setMessage("全部处理完毕！");
                                                 progressDialog.dismiss();
+                                                //延迟两秒进入
                                                 delayTurn();
                                             }
                                             //更新Dialog
-                                            updateProgressDialog();
+                                            //updateProgressDialog();
+                                            if (isSure) {
+                                                progressDialog.setMessage(o.getPath()
+                                                        + "\n已分析" + all + "张照片");
+                                            }
                                             Log.e(TAG, "onResponse: step3 访问标签成功");
                                         }
                                     });
+                            //存储好最优结果 跳出循环
                             break;
                         }
                     }
@@ -406,19 +436,20 @@ public class EntryActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<Label> call, Throwable throwable) {
                 fail++;
-                updateProgressDialog();
+                //updateProgressDialog();
                 Log.e(TAG, "onFailure: " + throwable.toString());
             }
         });
     }
 
-    private void updateProgressDialog() {
-        Log.e(TAG, "updateProgressDialog: 更新...");
-        //更新Dialog
-        progressDialog.setMessage("共需要分析" + count + "张图片\n"
-                + "已成功" + success + "张图片\n"
-                + "已失败" + fail + "张图片");
-    }
+//    private void updateProgressDialog() {
+//        Log.e(TAG, "updateProgressDialog: 更新...");
+//        //更新Dialog
+//        progressDialog.setTitle("分析图片");
+//        progressDialog.setMessage("共需要分析" + count + "张图片\n"
+//                + "已成功" + success + "张图片\n"
+//                + "已失败" + fail + "张图片");
+//    }
 
     //初始化COS
     private void initCosService() {
@@ -430,6 +461,7 @@ public class EntryActivity extends AppCompatActivity {
 
         URL url = null;
         try {
+            //搭建的后台密钥
             // URL 是后台临时密钥服务的地址，如何搭建服务请参考（https://cloud.tencent.com/document/product/436/14048）
             url = new URL("http://101.133.225.58/album/key");
         } catch (MalformedURLException e) {
@@ -450,9 +482,9 @@ public class EntryActivity extends AppCompatActivity {
 
     //获取图片路径
     private void initApp() {
-        //从内容提供器中搜索相机图片路径
+        //从内容提供器中搜索相机图片路径 like两边要加空格
         final Cursor photoCursor = this.getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                null, null, null, null);
+                null, MediaStore.Images.Media.DISPLAY_NAME + " like ?", new String[]{"IMG%"}, null);
         //开启线程进行存储
         Observable.create(new ObservableOnSubscribe<Picture>() {
             @Override
@@ -460,23 +492,29 @@ public class EntryActivity extends AppCompatActivity {
                 //int count = 0;
                 //获取本地图片信息
                 int num = 0;
+                //String path = getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath();
                 try {
                     //还有下一张图片或者图片数量没到设置的预期的时候继续处理
                     //TODO 增加图片限制
-                    while (photoCursor.moveToNext() && num < 20) {
+                    while (photoCursor.moveToNext()) {
                         String photoPath = photoCursor.getString(photoCursor.getColumnIndex(MediaStore.Images.Media.DATA));
+                        Log.e(TAG, "subscribe: " + photoPath);
 
-                        //如果不是相机拍摄的图片就跳过
-                        if (!photoPath.startsWith("/storage/emulated/0/相机")) {
-                            continue;
-                        }
                         //照片日期
                         long photoDate = photoCursor.getLong(photoCursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN));
+                        Log.e(TAG, "subscribe: 日期" + photoDate);
+
                         //照片标题
                         String photoTitle = photoCursor.getString(photoCursor.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME));
+//                        //如果图片名不是IMG开头说明不是手机拍摄照片 则跳过
+//                        if (!photoTitle.startsWith("IMG")) {
+//                            continue;
+//                        }
+                        Log.e(TAG, "subscribe: name" + photoTitle);
                         BitmapFactory.Options options = new BitmapFactory.Options();
                         options.inJustDecodeBounds = true;
                         BitmapFactory.decodeFile(photoPath, options);
+
                         //照片类型
                         String photoType = options.outMimeType;
 
@@ -487,6 +525,7 @@ public class EntryActivity extends AppCompatActivity {
 
                         //照片长度
                         String photoLength = String.valueOf(options.outHeight);
+
                         //照片宽度
                         String photoWidth = String.valueOf(options.outWidth);
 
@@ -538,24 +577,24 @@ public class EntryActivity extends AppCompatActivity {
                 .subscribe(new Observer<Picture>() {
                     @Override
                     public void onSubscribe(Disposable d) {
+                        //初始化dialog
                         if (progressDialog == null) {
                             progressDialog = new ProgressDialog(EntryActivity.this);
                         }
                         progressDialog.setTitle("扫描图片");
                         progressDialog.setMessage("请稍等...");
+                        //设置back键不能取消
                         progressDialog.setCancelable(false);
                         progressDialog.show();
                     }
 
                     @Override
                     public void onNext(Picture value) {
-                        try {
-                            //依据存入数据库的图片信息将图片压缩并上传到服务器
-                            updateProgressDialog();
-                            putObject(value.getName(), value.getPath(), value.getId());
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                        //依据存入数据库的图片信息将图片压缩并上传到服务器
+                        //updateProgressDialog();
+                        //更新dialog
+                        progressDialog.setMessage(value.getPath()
+                                + "\n已扫描" + count + "张照片");
                     }
 
                     @Override
@@ -565,8 +604,58 @@ public class EntryActivity extends AppCompatActivity {
 
                     @Override
                     public void onComplete() {
-                        isSure = true;
-                        //progressDialog.setMessage("扫描结束...");
+                        //完成扫描
+                        progressDialog.setMessage("请稍等...");
+                        //统计上传的图片数量
+                        count = 0;
+                        //开始上传和分析
+                        Observable.create(new ObservableOnSubscribe<Picture>() {
+                            @Override
+                            public void subscribe(ObservableEmitter<Picture> e) throws Exception {
+                                //从数据库中获取所有的图片
+                                List<Picture> pictures = DataSupport.findAll(Picture.class);
+                                for (Picture picture : pictures) {
+                                    try {
+                                        //上传
+                                        putObject(picture.getName(), picture.getPath(), picture.getId());
+                                    } catch (IOException exc) {
+                                        exc.printStackTrace();
+                                    }
+                                    count++;
+                                    //切回主线程
+                                    e.onNext(picture);
+                                }
+                                //所有上传请求完成
+                                e.onComplete();
+                            }
+                        })
+                                .subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe(new Observer<Picture>() {
+                                    @Override
+                                    public void onSubscribe(Disposable d) {
+                                        progressDialog.setTitle("分析图片");
+                                        progressDialog.setMessage("请稍等...");
+                                    }
+
+                                    @Override
+                                    public void onNext(Picture value) {
+                                        progressDialog.setMessage(value.getPath()
+                                                + "\n已上传" + count + "张照片");
+                                    }
+
+                                    @Override
+                                    public void onError(Throwable e) {
+
+                                    }
+
+                                    @Override
+                                    public void onComplete() {
+                                        progressDialog.setMessage("请稍等...");
+                                        //count的数量已被确定
+                                        isSure = true;
+                                    }
+                                });
                     }
                 });
     }
@@ -626,40 +715,31 @@ public class EntryActivity extends AppCompatActivity {
         cosXmlService.putObjectAsync(putObjectRequest, new CosXmlResultListener() {
             @Override
             public void onSuccess(CosXmlRequest cosXmlRequest, CosXmlResult result) {
+                //上传成功
                 PutObjectResult putObjectResult = (PutObjectResult) result;
                 Log.e(TAG, "putObject: " + picName + "  " + srcPath + "  上传结果： " + putObjectResult.httpCode);
                 //上传至COS服务器成功
-                Observable.create(new ObservableOnSubscribe<Picture>() {
-                    @Override
-                    public void subscribe(ObservableEmitter<Picture> e) throws Exception {
-                        //更新数据库isPut字段为true
-                        Picture picture = DataSupport.find(Picture.class, id);
-                        picture.setPut(true);
-                        picture.setPath(srcPath);
-                        picture.save();
-                        Log.e(TAG, "accept: step2成功");
-                        //count++;
-                        //切回主线程
-                        e.onNext(picture);
-                    }
-                })
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribe(new Consumer<Picture>() {
-                            @Override
-                            public void accept(Picture o) throws IOException {
-                                //获取已上传的图片的标签信息
-                                getLabels(o.getName(), o.getId());
-                            }
-                        });
+                //更新数据库isPut字段为true
+                Picture picture = DataSupport.find(Picture.class, id);
+                picture.setPut(true);
+                picture.setPath(srcPath);
+                picture.save();
+                Log.e(TAG, "accept: step2成功");
+                try {
+                    //获取标签
+                    getLabels(picName, id);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
 
             @Override
             public void onFail(CosXmlRequest cosXmlRequest, CosXmlClientException clientException, CosXmlServiceException serviceException) {
                 // todo Put object failed because of CosXmlClientException or CosXmlServiceException...
                 Log.e(TAG, "onFail: " + serviceException.getMessage() + "\n" + serviceException.getErrorCode());
+                //失败数量加一
                 fail++;
-                updateProgressDialog();
+                //updateProgressDialog();
             }
         });
     }

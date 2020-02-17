@@ -25,18 +25,24 @@ public class GalleryActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gallery);
+
+        initRecyclerView();
+
+        setBackButton();
+    }
+
+    private void initRecyclerView() {
         Intent intent = getIntent();
         String SecondCategory = intent.getStringExtra("SecondCategory");
+        String FirstCategory = intent.getStringExtra("FirstCategory");
         //设置标题栏为二级标签的名字
         setTitle(SecondCategory);
-        List<Picture> pictures = DataSupport.where("labelSecondCategory=?", SecondCategory).find(Picture.class);
+        List<Picture> pictures = DataSupport.where("labelFirstCategory=? and labelSecondCategory=? and Confidence >15", FirstCategory, SecondCategory).find(Picture.class);
         recyclerView = findViewById(R.id.gallery_recycler_view);
         GridLayoutManager gridLayoutManager = new GridLayoutManager(GalleryActivity.this, 2);
         recyclerView.setLayoutManager(gridLayoutManager);
-        PicAdapter picAdapter = new PicAdapter(pictures, this, THIRD_LEVEL);
+        PicAdapter picAdapter = new PicAdapter(pictures, this, THIRD_LEVEL, FirstCategory, SecondCategory);
         recyclerView.setAdapter(picAdapter);
-
-        setBackButton();
     }
 
     private void setBackButton() {

@@ -15,9 +15,19 @@ public class Picture extends DataSupport {
 
     String labelName;//标签名
 
+    int Confidence;//可信度
+
     String labelFirstCategory;
 
     String labelSecondCategory;
+
+    public int getConfidence() {
+        return Confidence;
+    }
+
+    public void setConfidence(int confidence) {
+        Confidence = confidence;
+    }
 
     public int getId() {
         return id;

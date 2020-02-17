@@ -19,7 +19,7 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface ApiService {
-
+//获取标签接口
 @GET("/{ObjectKey}")
 Call<Label> ImageAnalyse(@Path("ObjectKey") String picName,
                             @Query("ci-process") String process,

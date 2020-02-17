@@ -6,7 +6,7 @@ import org.simpleframework.xml.Root;
 @Root(name = "Labels", strict = false)
 public class LabelsBean {
     @Element
-    private String Confidence;
+    private int Confidence;
 
     @Element(required = false)
     private String FirstCategory;
@@ -17,12 +17,12 @@ public class LabelsBean {
     @Element(required = false)
     private String SecondCategory;
 
-    public String getConfidence() {
+    public int getConfidence() {
         return Confidence;
     }
 
-    public void setConfidence(String Confidence) {
-        this.Confidence = Confidence;
+    public void setConfidence(int confidence) {
+        Confidence = confidence;
     }
 
     public String getFirstCategory() {

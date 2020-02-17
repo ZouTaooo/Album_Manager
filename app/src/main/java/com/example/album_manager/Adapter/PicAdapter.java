@@ -29,6 +29,8 @@ public class PicAdapter extends RecyclerView.Adapter<PicAdapter.ViewHolder> {
     private final int FIRST_LEVEL = 1;
     private final int SECOND_LEVEL = 2;
     private final int THIRD_LEVEL = 3;
+    private String FirstCategory;
+    private String SecondCategory;
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         CardView cardView;
@@ -43,10 +45,12 @@ public class PicAdapter extends RecyclerView.Adapter<PicAdapter.ViewHolder> {
         }
     }
 
-    public PicAdapter(List<Picture> PicList, Context context, int level) {
+    public PicAdapter(List<Picture> PicList, Context context, int level, String FirstCategory, String SecondCategory) {
         this.level = level;
         this.mPicList = PicList;
         this.context = context;
+        this.FirstCategory = FirstCategory;
+        this.SecondCategory = SecondCategory;
     }
 
     @NonNull
@@ -68,6 +72,7 @@ public class PicAdapter extends RecyclerView.Adapter<PicAdapter.ViewHolder> {
                     case SECOND_LEVEL:
                         intent = new Intent(context, GalleryActivity.class);
                         intent.putExtra("SecondCategory", holder.PicName.getText());
+                        intent.putExtra("FirstCategory", FirstCategory);
                         Log.e(TAG, "onClick: 传递的二级类别是：" + holder.PicName.getText());
                         context.startActivity(intent);
                         break;
