@@ -9,6 +9,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Toast;
 
 import com.example.album_manager.Adapter.PicAdapter;
 import com.example.album_manager.Bean.Picture;
@@ -96,10 +99,31 @@ public class FirstCategoryActivity extends AppCompatActivity {
             for (Picture pic : pictures) {
                 Log.e(TAG, "onStart: id: " + pic.getId()
                         + "\nConfidence" + pic.getConfidence()
-                        + "\nName" + pic.getName()
+                        + "\nName" + pic.getLabelName()
                         + "\nSecond" + pic.getLabelSecondCategory()
-                        + "\nLabel: " + pic.getLabelName());
+                        + "\nLabel: " + pic.getLabelFirstCategory());
             }
         }
+    }
+
+
+    //此方法的作用是创建一个选项菜单，我们要重写这个方法
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        //加载菜单文件
+        getMenuInflater().inflate(R.menu.title_menu, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    //在点击这个菜单的时候，会做对应的事，类似于侦听事件，这里我们也要重写它
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        //这里是一个switch语句,主要通过menu文件中的id值来确定点了哪个菜单，然后做对应的操作，这里的menu是指你加载的那个菜单文件
+        switch (item.getItemId()) {
+            case R.id.Analyse:
+                Toast.makeText(this, "点击添加菜单", Toast.LENGTH_SHORT).show();
+                break;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

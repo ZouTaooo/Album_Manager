@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -21,11 +22,13 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 
 import com.bumptech.glide.Glide;
-import com.example.album_manager.Bean.Label;
-import com.example.album_manager.Bean.LabelsBean;
+import com.example.album_manager.Bean.ImageLabels;
+import com.example.album_manager.Bean.ImageUrl;
 import com.example.album_manager.Bean.Picture;
 import com.example.album_manager.Interface.ApiService;
 import com.example.album_manager.R;
+import com.example.album_manager.Util.HexUtils;
+import com.example.album_manager.Util.Sha256;
 import com.tencent.cos.xml.CosXmlService;
 import com.tencent.cos.xml.CosXmlServiceConfig;
 import com.tencent.cos.xml.exception.CosXmlClientException;
@@ -38,7 +41,6 @@ import com.tencent.cos.xml.model.bucket.GetBucketResult;
 import com.tencent.cos.xml.model.object.PutObjectRequest;
 import com.tencent.cos.xml.model.object.PutObjectResult;
 import com.tencent.cos.xml.model.tag.ListBucket;
-import com.tencent.cos.xml.utils.DigestUtils;
 import com.tencent.qcloud.core.auth.QCloudCredentialProvider;
 import com.tencent.qcloud.core.auth.SessionCredentialProvider;
 import com.tencent.qcloud.core.http.HttpRequest;
@@ -48,18 +50,17 @@ import org.litepal.crud.DataSupport;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
@@ -74,13 +75,16 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
-import retrofit2.converter.simplexml.SimpleXmlConverterFactory;
+import retrofit2.converter.gson.GsonConverterFactory;
 import top.zibin.luban.Luban;
 
 import static android.os.Environment.getExternalStoragePublicDirectory;
 
+@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 public class EntryActivity extends AppCompatActivity {
     private CosXmlService cosXmlService = null;
+
+    private final static Charset UTF8 = StandardCharsets.UTF_8;
 
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
@@ -244,10 +248,18 @@ public class EntryActivity extends AppCompatActivity {
                 });
     }
 
-    private void initRetrofit() {
+    public static byte[] hmac256(byte[] key, String msg) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key, mac.getAlgorithm());
+        mac.init(secretKeySpec);
+        return mac.doFinal(msg.getBytes(UTF8));
+    }
+
+
+    public void initRetrofit() {
         retrofit = new Retrofit.Builder()
-                .baseUrl("http://" + bucketName + ".cos." + region + ".myqcloud.com")
-                .addConverterFactory(SimpleXmlConverterFactory.create())
+                .baseUrl("https://tiia.tencentcloudapi.com")
+                .addConverterFactory(GsonConverterFactory.create())
                 .client(new OkHttpClient.Builder()
                         .retryOnConnectionFailure(true)
                         .connectTimeout(60, TimeUnit.SECONDS)
@@ -259,125 +271,84 @@ public class EntryActivity extends AppCompatActivity {
     }
 
     //获取标签
-    private void getLabels(String PicName, final int id) throws IOException {
-        //获取请求的签名
+    private void getLabels(String ImgUrl, final int id) throws Exception {
         long StartTime = System.currentTimeMillis() / 1000;//获取系统时间的10位的时间戳
-        long EndTime = StartTime + 7200;
-        //时间戳控制有效时间
-        String StartTimestamp = String.valueOf(StartTime);
-        String EndTimestamp = String.valueOf(EndTime);
-        String KeyTime = StartTimestamp + ";" + EndTimestamp;
-        String SignKey = null;
-        Log.e(TAG, "getLabels: keyTime: " + KeyTime);
-        Log.e(TAG, "getLabels: SecretKey: " + SecretKey);
-        try {
-            SignKey = DigestUtils.getHmacSha1(KeyTime, SecretKey);
-        } catch (CosXmlClientException e) {
-            e.printStackTrace();
-        }
-        String UrlParamList = "ci-process";
-        String HttpParameters = "ci-process=detect-label";
-        Calendar cd = Calendar.getInstance();
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss 'GMT'", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("GMT")); // 设置时区为GMT
-        String Date = sdf.format(cd.getTime());
-        String Host = "ai-album-1253931649.cos.ap-chengdu.myqcloud.com";
-        String HeaderList = "date;host";
-        String DateEncoded = null;
-        try {
-            DateEncoded = URLEncoder.encode(Date, "utf-8")
-                    .replace(",", "%2C")
-                    .replace("+", "%20")
-                    .replace(":", "%3A");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        String HostEncoded = null;
-        try {
-            HostEncoded = URLEncoder.encode(Host, "utf-8");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        String HttpHeaders = "date=" + DateEncoded + "&host=" + HostEncoded;
-        //路径
-        String HttpString = "get\n" +
-                "/" + PicName + "\n" +
-                HttpParameters + "\n" +
-                HttpHeaders + "\n";
+        String Timestamp = String.valueOf(StartTime);
+        String Action = "DetectLabel";
+        String Region = "ap-shanghai";
+        String Version = "2019-05-29";
+        String Date = new java.text.SimpleDateFormat("yyyy-MM-d").format(new java.util.Date(StartTime * 1000));
+        //String ImgUrl = "https://ai-album-1253931649.cos.ap-chengdu.myqcloud.com/IMG20160812003422.jpg";
+        //计算签名
+        System.out.println("{\"ImageUrl\":\"" + ImgUrl + "\"}");
+        String HashedRequestPayload = Sha256.getSHA256("{\"ImageUrl\":\"" + ImgUrl + "\"}");
+        String CanonicalRequest =
+                "POST" + '\n' +
+                        "/" + '\n' +
+                        "" + '\n' +
+                        "content-type:application/json\nhost:tiia.tencentcloudapi.com\n" + '\n' +
+                        "content-type;host" + '\n' +
+                        HashedRequestPayload;
+        System.out.println(CanonicalRequest);
+        System.out.println("-------------------------------------------------------");
 
-        String StringToSign = null;
-        try {
-            StringToSign = "sha1\n" +
-                    KeyTime + "\n" +
-                    DigestUtils.getSha1(HttpString) + "\n";
-        } catch (CosXmlClientException e) {
-            e.printStackTrace();
-        }
 
-        String Signature = null;
-        try {
-            Signature = DigestUtils.getHmacSha1(StringToSign, SignKey);
-        } catch (CosXmlClientException e) {
-            e.printStackTrace();
-        }
+        String HashedCanonicalRequest = Sha256.getSHA256(CanonicalRequest);
+        //1585279261
+        String StringToSign =
+                "TC3-HMAC-SHA256" + "\n" +
+                        Timestamp + "\n" +
+                        Date + "/tiia/tc3_request" + "\n" +
+                        HashedCanonicalRequest;
+        System.out.println(StringToSign);
 
-        //最终的签名结果
-        String res = "q-sign-algorithm=sha1" +
-                "&q-ak=" + SecretId +
-                "&q-sign-time=" + KeyTime +
-                "&q-key-time=" + KeyTime +
-                "&q-header-list=" + HeaderList +
-                "&q-url-param-list=" + UrlParamList +
-                "&q-signature=" + Signature;
-        Call<Label> getLabel = api.ImageAnalyse(PicName, "detect-label", Date, res);
-        //Log.e(TAG, "getLabels: 发起同步请求");
-//        //发同步请求
-//        Response<Label> response = getLabel.execute();
-//        List<LabelsBean> labels = response.body().getLabelList();
-//        if (response.code() == 200) {
-//            Log.e(TAG, "getLabels: 获取标签成功");
-//            for (LabelsBean labelsBean : labels) {
-//                if (labelsBean.getFirstCategory() != null && labelsBean.getSecondCategory() != null && labelsBean.getName() != null) {
-//                    Log.e(TAG, "getLabels: 修改数据库");
-//                    String FirstCategory = labelsBean.getFirstCategory();
-//                    String SecondCategory = labelsBean.getSecondCategory();
-//                    String LabelName = labelsBean.getName();
-//                    Picture pic = DataSupport.find(Picture.class, id);
-//                    pic.setLabelFirstCategory(FirstCategory);
-//                    pic.setLabelSecondCategory(SecondCategory);
-//                    pic.setLabelName(LabelName);
-//                    pic.save();
-//                }
-//            }
-//            return true;
-//        }
-//        return false;
+        System.out.println("---------------------------------------------------------");
 
+        byte[] secretDate = hmac256(("TC3" + SecretKey).getBytes(UTF8), Date);
+        byte[] secretService = hmac256(secretDate, "tiia");
+        byte[] secretSigning = hmac256(secretService, "tc3_request");
+        byte[] signature = hmac256(secretSigning, StringToSign);
+        final String res = HexUtils.bytes2Hex(signature);
+        System.out.println(res);
+        System.out.println("---------------------------------------------------------");
+
+        String s1 = "TC3-HMAC-SHA256 "
+                + "Credential=" + SecretId
+                + "/" + Date + "/tiia/tc3_request"
+                + ",";
+        String s2 = "SignedHeaders=content-type;host" +
+                ",";
+        String s3 = "Signature=" + res;
+        String Authorization = s1 + s2 + s3;
+        System.out.println(Authorization);
+        System.out.println("---------------------------------------------------------");
+
+        String Host = "tiia.tencentcloudapi.com";
+        String Content_Type = "application/json";
+        ImageUrl url = new ImageUrl();
+        url.setImageUrl(ImgUrl);
+
+        Call<ImageLabels> call = api.ImageAnalyse(url,
+                Content_Type,
+                Host,
+                Action, Region, Version, Timestamp, Authorization);
         Log.e(TAG, "getLabels: 发送异步请求");
-        //发异步请求
+//        发异步请求
 //        num++;//
-        getLabel.enqueue(new Callback<Label>() {
+        call.enqueue(new Callback<ImageLabels>() {
             @Override
-            public void onResponse(Call<Label> call, Response<Label> response) {
-//                Log.e(TAG, "onResponse: " + response.code());
-//                Log.e(TAG, "onResponse: " + response.message());
-                // Log.e(TAG, "onResponse: " + response.toString());
-                // Log.e(TAG, "onResponse: " + response.isSuccessful());
-                // Log.e(TAG, "onResponse: " + response.errorBody());
-                //获取标签成功
+            public void onResponse(Call<ImageLabels> call, Response<ImageLabels> response) {
                 success++;
                 if (response.body() != null) {
-//                    Log.e(TAG, "onResponse: " + response.raw().toString());
-//                    Log.e(TAG, "onResponse: " + response.body().getLabelList().toString());
-//                    Log.e(TAG, "onResponse: " + response.body().getLabelList().size());
                     //选择可信度最高的标签 更新数据库
-                    List<LabelsBean> list = response.body().getLabelList();
+                    List<ImageLabels.ResponseBean.LabelsBean> list = response.body().getResponse().getLabels();
                     //int confidence = list.get(0).getConfidence();
-                    for (LabelsBean label : list) {
+                    for (ImageLabels.ResponseBean.LabelsBean label : list) {
                         final String LabelName = label.getName();
                         final String FirstCategory = label.getFirstCategory();
                         final String SecondCategory = label.getSecondCategory();
                         final int Confidence = label.getConfidence();
+                        Log.e(TAG, "onResponse: " + LabelName + "  " + FirstCategory + "  " + SecondCategory + "  " + Confidence);
                         //防止有空数据 判断全部都有效再存入
                         if (LabelName != null && FirstCategory != null && SecondCategory != null) {
                             //切入IO线程进行数据库操作
@@ -404,6 +375,9 @@ public class EntryActivity extends AppCompatActivity {
                                         public void accept(Picture o) throws Exception {
                                             //如果count的值已确定，且所有图片处理完毕
                                             int all = success + fail;
+                                            Log.e(TAG, "accept: fail  " + fail);
+                                            Log.e(TAG, "accept: success  " + success);
+                                            Log.e(TAG, "accept: all " + all);
                                             //count已确定且所有请求结果都获得
                                             if (all == count && isSure) {
                                                 //写入缓存-初始化完成
@@ -415,6 +389,7 @@ public class EntryActivity extends AppCompatActivity {
                                                 //延迟两秒进入
                                                 delayTurn();
                                             }
+                                            Log.e(TAG, "accept: " + isSure);
                                             //更新Dialog
                                             //updateProgressDialog();
                                             if (isSure) {
@@ -434,22 +409,12 @@ public class EntryActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(Call<Label> call, Throwable throwable) {
+            public void onFailure(Call<ImageLabels> call, Throwable t) {
                 fail++;
-                //updateProgressDialog();
-                Log.e(TAG, "onFailure: " + throwable.toString());
             }
         });
     }
 
-//    private void updateProgressDialog() {
-//        Log.e(TAG, "updateProgressDialog: 更新...");
-//        //更新Dialog
-//        progressDialog.setTitle("分析图片");
-//        progressDialog.setMessage("共需要分析" + count + "张图片\n"
-//                + "已成功" + success + "张图片\n"
-//                + "已失败" + fail + "张图片");
-//    }
 
     //初始化COS
     private void initCosService() {
@@ -727,8 +692,11 @@ public class EntryActivity extends AppCompatActivity {
                 Log.e(TAG, "accept: step2成功");
                 try {
                     //获取标签
-                    getLabels(picName, id);
+                    String url = "https://ai-album-1253931649.cos.ap-chengdu.myqcloud.com/" + picName;
+                    getLabels(url, id);
                 } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
