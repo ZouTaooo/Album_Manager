@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".MyApplication"
@@ -16,6 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <activity android:name=".Activity.ResultActivity"></activity>
         <activity android:name=".Activity.EntryActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -26,8 +28,16 @@
         <activity android:name=".Activity.InfoActivity" />
         <activity android:name=".Activity.GalleryActivity" />
         <activity android:name=".Activity.SecondCategoryActivity" />
-        <activity android:name=".Activity.FirstCategoryActivity">
-        </activity>
+        <activity android:name=".Activity.FirstCategoryActivity" /> <!-- FileProvider配置访问路径，适配7.0及其以上 -->
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="com.example.album_manager.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

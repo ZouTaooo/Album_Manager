@@ -24,6 +24,10 @@ public class InfoActivity extends AppCompatActivity {
         Intent intent = getIntent();
         String PicName = intent.getStringExtra("PicName");
         Picture picture =  DataSupport.where("name=?", PicName).findFirst(Picture.class);
+        initView(picture);
+    }
+
+    private void initView(Picture picture) {
         //设置标题栏为当前图片的标签名
         setTitle(picture.getLabelName());
         //显示图片
