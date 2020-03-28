@@ -88,8 +88,8 @@ public class EntryActivity extends AppCompatActivity {
 
     final private String region = "ap-chengdu";
     final private String bucketName = "ai-album-1253931649";
-    final private String SecretId = "AKIDf7LK4CUmGUUEiw9mRt68ub7PZWM1q0B7";
-    final private String SecretKey = "nNjuwjHadYFh7PWO1OXXM1QaZO4VhnhL";
+    final private String SecretId = "*********************";
+    final private String SecretKey = "**********************";
 
     private ProgressDialog progressDialog = null;
     private int count = 0;//统计图片数量
